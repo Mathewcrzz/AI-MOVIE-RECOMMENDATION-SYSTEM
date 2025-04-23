@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from model import NCF
+from server.model import NCF
 from supabase import create_client
 from dotenv import load_dotenv
 import os
