@@ -1,7 +1,10 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from server.model import NCF
+try:
+    from server.model import NCF
+except ModuleNotFoundError:
+    from model import NCF
 from supabase import create_client
 from dotenv import load_dotenv
 import os
