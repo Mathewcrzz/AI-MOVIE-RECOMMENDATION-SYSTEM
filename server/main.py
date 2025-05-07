@@ -27,6 +27,8 @@ load_dotenv()
 # Supabase client setup
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+print(f"Loaded SUPABASE_URL: {SUPABASE_URL}")
+print(f"Loaded SUPABASE_KEY starts with: {SUPABASE_KEY[:5] + '...'}" if SUPABASE_KEY else "SUPABASE_KEY not found")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # Load user-movie interactions with weights
@@ -151,3 +153,43 @@ def recommend_movies(req: RecommendationRequest):
     recommended = [movie_ids[i] for i in top_k_indices]
 
     return {"user_id": req.user_id, "recommendations": recommended}
+
+@app.get("/healthz")
+def health():
+    return {"status": "running"}
+
+class ChatRequest(BaseModel):
+    message: str
+
+@app.post("/chat")
+def simple_chat(req: ChatRequest):
+    msg = req.message.lower()
+
+    if "recommend" in msg:
+        return {"response": "Sure! How about watching 'Inception', 'Interstellar', or 'The Matrix'?"}
+    elif "hello" in msg or "hi" in msg:
+        return {"response": "Hey there! 👋 What movie vibe are you in the mood for today?"}
+    elif "bye" in msg:
+        return {"response": "Goodbye! Come back anytime for more movie magic 🎬"}
+    else:
+        return {"response": "I'm just a baby chatbot 🍼. Try asking for a recommendation!"}
+
+
+class ProgressRequest(BaseModel):
+    user_id: str
+    movie_id: int
+    progress_time: float
+
+@app.post("/save-progress")
+def save_progress(data: ProgressRequest):
+    supabase.table("continue_watching").upsert({
+        "user_id": data.user_id,
+        "movie_id": data.movie_id,
+        "progress_time": data.progress_time
+    }).execute()
+    return {"message": "Progress saved"}
+
+@app.get("/continue-watching/{user_id}")
+def get_continue_watching(user_id: str):
+    result = supabase.table("continue_watching").select("*").eq("user_id", user_id).execute()
+    return result.data

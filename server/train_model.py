@@ -56,7 +56,7 @@ loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
 # Train
-epochs = 10
+epochs = 30
 for epoch in range(epochs):
     model.train()
     preds = model(user_ids, movie_ids).squeeze()

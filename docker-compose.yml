@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: dockerfile/Dockerfile
+    container_name: backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    volumes:
+      - ./server:/app/server
+    restart: always
+
+  client:
+    build:
+      context: .
+      dockerfile: client/Dockerfile
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server
+    environment:
+      - NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+    volumes:
+      - ./client:/app
+    restart: always

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { Container, Typography, Card, CardMedia, CardContent } from '@mui/material';
 import UserInteraction from '../../components/UserInteraction';
@@ -12,6 +12,8 @@ export default function MovieDetail() {
   const [userId, setUserId] = useState<string | null>(null);
   const [trailer, setTrailer] = useState<string | null>(null);
   const [cast, setCast] = useState<any[]>([]);
+  const [globalTrending, setGlobalTrending] = useState<any[]>([]);
+  const playerRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
     async function fetchMovieDetails() {
@@ -38,23 +40,43 @@ export default function MovieDetail() {
       fetchTrailer();
       fetchCast();
     }
-    const saveProgress = async (progress: number) => {
-      const { data: { user } } = await supabase.auth.getUser();
-    
-      if (!user) return;
-    
-      await supabase.from('watch_history').upsert({
-        user_id: user.id,
-        movie_id: movie.id, // TMDb movie id
-        progress,
-        updated_at: new Date(),
-      });
-    };
 
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) setUserId(data.user.id);
     });
   }, [id]);
+
+  useEffect(() => {
+    const fetchGlobalTrending = async () => {
+      const res = await fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${process.env.NEXT_PUBLIC_TMDB_API_KEY}`);
+      const data = await res.json();
+      setGlobalTrending(data.results || []);
+    };
+    fetchGlobalTrending();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const progress = playerRef.current?.contentWindow?.postMessage(
+        '{"event":"listening"}',
+        '*'
+      );
+      // Replace with custom logic to track time via another player if needed
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [movie]);
+
+  const saveProgress = async (progress: number) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user || !movie?.id) return;
+
+    await supabase.from('watch_history').upsert({
+      user_id: user.id,
+      movie_id: movie.id,
+      progress,
+      updated_at: new Date(),
+    });
+  };
 
   if (!movie) return <p>Loading...</p>;
 
@@ -63,6 +85,7 @@ export default function MovieDetail() {
       {trailer && (
         <div style={{ marginBottom: '20px' }}>
           <iframe
+            ref={playerRef}
             width="100%"
             height="500"
             src={`https://www.youtube.com/embed/${trailer}?autoplay=1&mute=1&controls=1`}
@@ -116,6 +139,24 @@ export default function MovieDetail() {
       </div>
 
       {userId && id && <UserInteraction movieId={parseInt(id as string)} userId={userId} />}
+
+      {globalTrending.length > 0 && (
+        <section style={{ marginTop: 40 }}>
+          <h2 style={{ color: 'white', marginBottom: '1rem' }}>🔥 Global Trending</h2>
+          <div style={{ display: 'flex', overflowX: 'auto', gap: '1rem' }}>
+            {globalTrending.map((movie) => (
+              <div key={movie.id} style={{ minWidth: 160 }}>
+                <img
+                  src={`https://image.tmdb.org/t/p/w200${movie.poster_path}`}
+                  alt={movie.title}
+                  style={{ width: '100%', borderRadius: 8 }}
+                />
+                <p style={{ color: 'white', margin: '0.5rem 0' }}>{movie.title}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </Container>
   );
 }

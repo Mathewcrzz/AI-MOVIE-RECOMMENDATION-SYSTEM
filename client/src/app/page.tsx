@@ -1,4 +1,5 @@
 'use client';
+import ChatToggle from './components/ChatToggle';
 import React, { useState, useEffect } from 'react';
 type Movie = {
   id: number;
@@ -22,12 +23,49 @@ import StarIcon from '@mui/icons-material/Star';
 import { useRouter } from 'next/navigation';
 import ReactPlayer from 'react-player/youtube';
 
+
 const TMDB_API_KEY = process.env.NEXT_PUBLIC_TMDB_API_KEY;
+
+const handleChatbotQuery = async (query: string) => {
+  try {
+    const res = await fetch('/api/chatbot', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query }),
+    });
+    const data = await res.json();
+    console.log('Chatbot response:', data);
+    // You can integrate this response with a chatbot UI component
+  } catch (error) {
+    console.error('Error querying chatbot:', error);
+  }
+};
 
 export default function Home() {
   const router = useRouter();
   const [movies, setMovies] = useState<Movie[]>([]);
   const [trending, setTrending] = useState<Movie[]>([]);
+  const [trendingIndia, setTrendingIndia] = useState<Movie[]>([]);
+  const [trendingUS, setTrendingUS] = useState<Movie[]>([]);
+  useEffect(() => {
+    const fetchRegionalTrending = async () => {
+      try {
+        const [indiaRes, usRes] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${TMDB_API_KEY}&region=IN`),
+          fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${TMDB_API_KEY}&region=US`)
+        ]);
+        const indiaData = await indiaRes.json();
+        const usData = await usRes.json();
+        setTrendingIndia(indiaData.results || []);
+        setTrendingUS(usData.results || []);
+      } catch (err) {
+        console.error("Error fetching regional trending:", err);
+      }
+    };
+    fetchRegionalTrending();
+  }, []);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [bannerTrailer, setBannerTrailer] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
@@ -68,20 +106,43 @@ useEffect(() => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('watch_history')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as unknown as string) // ensure user.id is treated as uuid in query
         .gt('progress', 0)
         .lt('progress', 100)
         .order('updated_at', { ascending: false });
 
-        const movies = await Promise.all((data ?? []).map(async (item: any) => {        const res = await fetch(`https://api.themoviedb.org/3/movie/${item.movie_id}?api_key=${TMDB_API_KEY}`);
-        const movie = await res.json();
-        return { ...movie, progress: item.progress };
-      }));
+      if (error) {
+        console.error('Error fetching watch history:', error);
+        return;
+      }
 
-      setContinueWatching(movies as Movie[]);
+      const movies = await Promise.all(
+        (data ?? []).map(async (item: any) => {
+          // Ensure progress is a number between 0 and 100
+          if (
+            typeof item.progress !== 'number' ||
+            item.progress <= 0 ||
+            item.progress >= 100
+          ) {
+            return null;
+          }
+          try {
+            const res = await fetch(
+              `https://api.themoviedb.org/3/movie/${item.movie_id}?api_key=${TMDB_API_KEY}`
+            );
+            const movie = await res.json();
+            return { ...movie, progress: item.progress };
+          } catch (err) {
+            console.error('Error fetching movie details:', err);
+            return null;
+          }
+        })
+      );
+
+      setContinueWatching(movies.filter(Boolean) as Movie[]);
     };
 
     fetchContinueWatching();
@@ -194,6 +255,9 @@ useEffect(() => {
       <Typography variant="h4" align="center" sx={{ color: '#fff', fontFamily: 'Poppins' }}>
         🎬 Movie Recommender
       </Typography>
+      <Button variant="contained" onClick={() => handleChatbotQuery('recommend movie')}>
+        Ask Chatbot
+      </Button>
       {/* Search and Content Type Toggle UI at top */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 2, mb: 4 }}>
         <TextField
@@ -381,6 +445,56 @@ useEffect(() => {
               </Card>
             ))}
           </Box>
+
+          {/* 🇮🇳 Trending in India */}
+          <Typography variant="h5" sx={{ color: '#fff', mt: 4 }}>🇮🇳 Trending in India</Typography>
+          <Box sx={{ display: 'flex', overflowX: 'auto', gap: 2, py: 2 }}>
+            {trendingIndia.map((movie: Movie) => (
+              <Card
+                key={movie.id}
+                onClick={() => router.push(`/movie/${movie.id}`)}
+                sx={{
+                  minWidth: 200, maxWidth: 200, height: 340, cursor: 'pointer',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  '&:hover': { boxShadow: '0 0 10px #f5c518', transform: 'scale(1.03)' }
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  height="300"
+                  image={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                />
+                <CardContent>
+                  <Typography sx={{ color: '#fff' }}>{movie.title}</Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
+
+          {/* 🇺🇸 Trending in the US */}
+          <Typography variant="h5" sx={{ color: '#fff', mt: 4 }}>🇺🇸 Trending in the US</Typography>
+          <Box sx={{ display: 'flex', overflowX: 'auto', gap: 2, py: 2 }}>
+            {trendingUS.map((movie: Movie) => (
+              <Card
+                key={movie.id}
+                onClick={() => router.push(`/movie/${movie.id}`)}
+                sx={{
+                  minWidth: 200, maxWidth: 200, height: 340, cursor: 'pointer',
+                  backgroundColor: 'rgba(255,255,255,0.05)',
+                  '&:hover': { boxShadow: '0 0 10px #f5c518', transform: 'scale(1.03)' }
+                }}
+              >
+                <CardMedia
+                  component="img"
+                  height="300"
+                  image={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                />
+                <CardContent>
+                  <Typography sx={{ color: '#fff' }}>{movie.title}</Typography>
+                </CardContent>
+              </Card>
+            ))}
+          </Box>
         </>
       )}
 
@@ -436,6 +550,7 @@ useEffect(() => {
         </Typography>
       )}
     </Container>
+    <ChatToggle />
     </>
   );
 }
