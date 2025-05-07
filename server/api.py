@@ -1,3 +1,10 @@
+# ----------------------------------------------------------
+#  File: api.py
+#  Author: Aakaash
+#  Created: 2025
+#  Description: FastAPI backend server for Movie Recommender
+#  Copyright (c) 2025 Aakaash. All rights reserved.
+# ----------------------------------------------------------
 from fastapi import FastAPI, Request
 from inference import recommend_movies
 from chatbot import get_chatbot_response  # make sure this function exists

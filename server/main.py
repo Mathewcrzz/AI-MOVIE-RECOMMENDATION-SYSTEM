@@ -1,3 +1,10 @@
+# ----------------------------------------------------------
+#  File: main.py
+#  Author: Aakaash Mathew
+#  Created: 2025
+#  Description: FastAPI backend server for Movie Recommender
+#  Copyright (c) 2025 Aakaash. All rights reserved.
+# ----------------------------------------------------------
 import torch
 import torch.nn as nn
 import torch.optim as optim
